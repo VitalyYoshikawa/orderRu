@@ -8,10 +8,6 @@ import {AttributeValue, Product} from "~/interfaces/product"
 export default defineEventHandler(async (event: H3Event): Promise<Product | null> => {
     const id = getRouterParam(event, "id")
 
-    if (!id) {
-        throw new Error("ID is required")
-    }
-
     const query = qs.stringify(
         {
             filters: {
@@ -47,6 +43,7 @@ export default defineEventHandler(async (event: H3Event): Promise<Product | null
         }
     )
 
+
     const { data } = await $fetch<{ data: Product[] }>(
         `${BACKEND_DOMAIN}/api/products?${query}`
     )
@@ -54,7 +51,7 @@ export default defineEventHandler(async (event: H3Event): Promise<Product | null
     if (!data || data.length === 0) {
         return null
     }
-    console.log(data[0].attribute_values)
+
     const groupedAttributes = data[0].attribute_values.map((attr): AttributeValue => ({
         name: attr.attribute.name,
         value: attr.name,

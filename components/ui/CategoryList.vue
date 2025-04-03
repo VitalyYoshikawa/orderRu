@@ -2,19 +2,20 @@
 import type {CategoryLink} from "~/interfaces/category"
 
 defineProps<{
-  title?: string,
-  items: CategoryLink[]
+  name?: string,
+  url?: string,
+  subcategories: CategoryLink[]
 }>()
 </script>
 
 <template>
-  <div class="category-list" v-if="title && items.length">
-    <span class="category-list__title">{{ title }}</span>
+  <div class="category-list" v-if="name && subcategories.length">
+    <NuxtLink :to="url" class="category-list__title">{{ name }}</NuxtLink>
     <NuxtLink
         class="category-list__item"
-        v-for="(item, index) in items"
+        v-for="(item, index) in subcategories"
         :key="index"
-        :to="item.url"
+        :to="`/categories/${item.url}`"
     >
       {{item.name}}
     </NuxtLink>
@@ -29,4 +30,6 @@ defineProps<{
   gap: 7px
 .category-list__item
   width: max-content
+.category-list__title
+  color: var(--color-black)
 </style>

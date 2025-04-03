@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import type {Card, Product} from "~/interfaces/product"
+import getSeo from "~/utils/getSeo";
 
 
 const paramId = useRouter().currentRoute.value.params.id
-const recommendations = await useCustomFetch<Card[]>('/api/product/recommendations')
-const data = await useCustomFetch<Product>(`/api/product/${paramId}`)
+
+const seo = await getSeo()
+const recommendations = await useCustomFetch<Card[]>('/api/products/recommendations')
+const data = await useCustomFetch<Product>(`/api/products/${paramId}`)
 
 </script>
 
 <template>
   <div class="product" v-if="data">
-    <UiBreadCrumbs :items="[{name: 'Что-то', url: '/'}]"/>
+    <UiBreadCrumbs :items="seo?.breadcrumbs"/>
     <div class="product__container">
       <div class="product__sticky">
         <ProductGallery :images="data.media"/>

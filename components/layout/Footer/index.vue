@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {CategoryListLink} from "~/interfaces/category";
 
-const categoryList = await useCustomFetch<CategoryListLink[]>('/api/category/list')
+const categoryList = await useCustomFetch<CategoryListLink[]>('/api/categories/list')
 </script>
 
 <template>
@@ -25,8 +25,9 @@ const categoryList = await useCustomFetch<CategoryListLink[]>('/api/category/lis
       <UiCategoryList
           v-for="(item, index) in categoryList"
           :key="index"
-          :title="item.title"
-          :items="item.items"
+          :name="item.name"
+          :url="`/categories/${item.url}`"
+          :subcategories="item.subcategories"
       />
     </div>
   </footer>

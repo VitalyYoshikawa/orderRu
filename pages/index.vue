@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type {Card} from "~/interfaces/product"
 
-const almostForFree = await useCustomFetch<Card[]>('/api/product/almost-for-free')
-const specialOffers = await useCustomFetch<Card[]>('/api/product/special-offers')
-const recommendations = await useCustomFetch<Card[]>('/api/product/recommendations')
+const almostForFree = await useCustomFetch<Card[]>('/api/products/almost-for-free')
+const specialOffers = await useCustomFetch<Card[]>('/api/products/special-offers')
+const recommendations = await useCustomFetch<Card[]>('/api/products/recommendations')
 </script>
 
 <template>

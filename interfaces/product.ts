@@ -5,8 +5,8 @@ export interface Card {
     price: number,
     originalPrice: number,
     url: string,
-    rating: number,
-    commentCount: number,
+    rating?: number,
+    commentCount?: number,
     favorite?: boolean | null | undefined
 }
 

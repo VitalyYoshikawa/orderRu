@@ -1,16 +1,13 @@
 <script setup lang="ts">
-interface Item {
-  url: string,
-  name: string,
-}
+import type {Breadcrumb} from "~/interfaces/seo"
 
 defineProps<{
-  items: Item[]
+  items?: Breadcrumb[]
 }>()
 </script>
 
 <template>
-  <ul class="bread-crumbs">
+  <ul class="bread-crumbs" v-if="items">
     <li
         class="bread-crumbs__item"
         v-for="(item, index) in items"
@@ -18,7 +15,7 @@ defineProps<{
     >
       <span
           class="bread-crumbs__name"
-          v-if="index === 1"
+          v-if="index === items.length - 1"
       >
         {{item.name}}
       </span>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CategoryLink } from '~/interfaces/category'
 
-const popularCategories = await useCustomFetch<CategoryLink[]>('/api/category/popular')
+const popularCategories = await useCustomFetch<CategoryLink[]>('/api/categories/popular')
 </script>
 
 <template>

@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import type {Card} from "~/interfaces/product"
 import type {Filter} from "~/interfaces/category"
+import getSeo from "~/utils/getSeo"
 
 const paramId = useRouter().currentRoute.value.params.id
 
-const listFilter = await useCustomFetch<Filter[]>(`/api/category/filter/${paramId}`)
-const listProduct = await useCustomFetch<Card[]>(`/api/category/list-product/${paramId}`)
+const seo = await getSeo()
+const listFilter = await useCustomFetch<Filter[]>(`/api/categories/filter/${paramId}`)
+const listProduct = await useCustomFetch<Card[]>(`/api/categories/list-product/${paramId}`)
 
 </script>
 
 <template>
   <div class="category">
-    <h1 class="category__title">Категория</h1>
-    <UiBreadCrumbs :items="[{name: 'Что-то', url: '/'}]"/>
+    <h1 class="category__title">{{seo?.title}}</h1>
+    <UiBreadCrumbs :items="seo?.breadcrumbs"/>
     <div class="category__container">
       <CategoryFilter :filters="listFilter" />
       <div class="category__content">

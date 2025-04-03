@@ -12,7 +12,7 @@ defineProps<{
         class="popular-categories__item"
         v-for="(item, index) in list"
         :key="index"
-        :to="item.url"
+        :to="`/categories/${item.url}`"
     >
       {{ item.name }}
     </NuxtLink>

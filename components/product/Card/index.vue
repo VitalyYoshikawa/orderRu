@@ -15,7 +15,7 @@ defineProps<{
 
 <template>
   <div class="product-card">
-    <NuxtLink class="product-card__link" :to="`/product/${url}`">
+    <NuxtLink class="product-card__link" :to="`/products/${url}`">
       <ProductCardSlider :images="images"/>
       <div class="product-card__price">
         <ProductPrice v-if="price" :number="price"/>
