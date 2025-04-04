@@ -1,74 +1,47 @@
 import { H3Event } from "h3"
 import { BACKEND_DOMAIN } from "~/const/common"
-import qs from 'qs'
 import type { Card } from "~/interfaces/product"
-import {QueryParams} from "~/interfaces/category";
 
-
-const buildQuery = (id: string): [string, QueryParams] | null => {
-    const baseParams: QueryParams = {
-        filters: { url: { $eq: id } },
-        populate: {},
-        fields: ['id'],
-    }
-
-    switch (true) {
-        case id.startsWith('cat_'):
-            baseParams.populate.subcategories = {
-                populate: {
-                    type_products: {
-                        populate: {
-                            products: {
-                                fields: ['name', 'url', 'original_price', 'price'],
-                                populate: { media: { fields: ['url', 'mime'] } }
-                            }
-                        }
-                    }
-                }
-            }
-            return ['categories', baseParams]
-
-        case id.startsWith('subcat_'):
-            baseParams.populate.type_products = {
-                populate: {
-                    products: {
-                        fields: ['name', 'url', 'original_price', 'price'],
-                        populate: { media: { fields: ['url', 'mime'] } }
-                    }
-                }
-            }
-            return ['subcategories', baseParams]
-
-        case id.startsWith('type_'):
-            baseParams.populate.products = {
-                fields: ['name', 'url', 'original_price', 'price'],
-                populate: { media: { fields: ['url', 'mime'] } }
-            }
-            return ['type-products', baseParams]
-
-        default:
-            return null
-    }
+interface QueryParamsResult {
+    section: string
+    params: string
 }
 
-const extractProducts = (data: any, id: string): any[] => {
-    const item = data[0]
-    if (!item) return []
 
-    switch (true) {
-        case id.startsWith('cat_'):
-            return item.subcategories?.flatMap((sub: any) =>
-                sub.type_products?.flatMap((type: any) => type.products || []) || []
-            ) || []
+const queryParams = (id: string, filter: string[] | Array<string>[]): QueryParamsResult => {
+    let queryStr = ''
+    if (filter.length) {
+        filter.forEach((val, index) => {
+            if (Array.isArray(val)) {
+                val.forEach((val: string) => {
+                    queryStr += `filters[$or][${index}][attribute_values][value][$eq]=${val}&`
+                })
+            } else {
+                queryStr += `filters[$and][${index}][attribute_values][value][$eq]=${val}&`
+            }
+        })
+    }
 
-        case id.startsWith('subcat_'):
-            return item.type_products?.flatMap((type: any) => type.products || []) || []
+    let categoryFilter: string
+    if (id.startsWith('cat_')) {
+        categoryFilter = `filters[$and][${filter.length}][type_product][subcategory][category][url][$eq]=${id}`
+    } else if (id.startsWith('subcat_')) {
+        categoryFilter = `filters[$and][${filter.length}][type_product][subcategory][url][$eq]=${id}`
+    } else if (id.startsWith('type_')) {
+        categoryFilter = `filters[$and][${filter.length}][type_product][url][$eq]=${id}`
+    } else {
+        categoryFilter = `filters[type_product][subcategory][category][url][$eq]=${id}`
+    }
 
-        case id.startsWith('type_'):
-            return item.products || []
+    if (filter.length) {
+        queryStr += categoryFilter
+    } else {
+        queryStr = categoryFilter
+    }
 
-        default:
-            return []
+    return {
+        section: 'products',
+        params: `?${queryStr}&populate[media][fields][0]=url`
     }
 }
 
@@ -76,8 +49,7 @@ const formatProductCard = (product: any): Card => {
     return {
         id: product.id,
         name: product.name,
-        images: product.media?.filter((item: any) => item.mime.startsWith('image/'))
-            .map((image: any) => `${BACKEND_DOMAIN}${image.url}`) || [],
+        images: product.media?.map((image: any) => `${BACKEND_DOMAIN}${image.url}`) || [],
         price: product.price ? product.price : product.original_price,
         originalPrice: product.price ? product.original_price : null,
         url: product.url,
@@ -86,21 +58,34 @@ const formatProductCard = (product: any): Card => {
 
 export default defineEventHandler(async (event: H3Event): Promise<Card[]> => {
     const id = getRouterParam(event, 'id')
+    const filter: object = await readBody(event)
+
+    let filterStr: string[] = []
+
+    Object.values(filter).forEach((item) => {
+        if (item.includes('%')) {
+            filterStr.push(item.split('%'))
+        } else {
+            filterStr.push(item)
+        }
+    })
+
+
     if (!id) return []
 
-    const queryData = buildQuery(id)
-    if (!queryData) return []
+    const { section, params } = queryParams(id, filterStr)
 
-    const [entity, queryParams] = queryData
     try {
         const { data } = await $fetch<any>(
-            `${BACKEND_DOMAIN}/api/${entity}?${qs.stringify(queryParams, { encodeValuesOnly: true })}`
+            `${BACKEND_DOMAIN}/api/${section}${params}`
         )
 
         if (!data?.length) return []
 
-        const products = extractProducts(data, id)
-        return products.map(formatProductCard)
+        const result = data.map((item: any) => formatProductCard(item))
+
+        return result
+
     } catch (error) {
         console.error('Error fetching products:', error)
         return []

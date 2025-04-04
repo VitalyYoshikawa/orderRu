@@ -14,9 +14,19 @@ export interface CategoryListLink {
 }
 
 export interface QueryParams {
-    filters: { url: { $eq: string } }
-    populate: Record<string, any>
-    fields: string[]
+    filters?: {
+        [key: string]: any
+    }
+    populate: {
+        [key: string]: any
+    }
+    fields?: string[]
+    // Добавляем новые параметры
+    sort?: string[]
+    pagination?: {
+        page?: number
+        pageSize?: number
+    }
 }
 
 export interface AttributeData {

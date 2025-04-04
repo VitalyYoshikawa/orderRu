@@ -3,12 +3,22 @@ import type {Card} from "~/interfaces/product"
 import type {Filter} from "~/interfaces/category"
 import getSeo from "~/utils/getSeo"
 
-const paramId = useRouter().currentRoute.value.params.id
+const router = useRouter().currentRoute.value
 
 const seo = await getSeo()
-const listFilter = await useCustomFetch<Filter[]>(`/api/categories/filter/${paramId}`)
-const listProduct = await useCustomFetch<Card[]>(`/api/categories/list-product/${paramId}`)
+const listFilter = await useCustomFetch<Filter[]>(`/api/categories/filter/${router.params.id}`)
+const listProduct = ref(await useCustomFetch<Card[]>(`/api/categories/list-product/${router.params.id}`, {
+  method: "POST",
+  body: router.query
+}))
 
+const updateFilter = async () => {
+  const router = useRouter().currentRoute.value
+  listProduct.value = await $fetch<Card[]>(`/api/categories/list-product/${router.params.id}`, {
+    method: "POST",
+    body: router.query
+  })
+}
 </script>
 
 <template>
@@ -16,7 +26,7 @@ const listProduct = await useCustomFetch<Card[]>(`/api/categories/list-product/$
     <h1 class="category__title">{{seo?.title}}</h1>
     <UiBreadCrumbs :items="seo?.breadcrumbs"/>
     <div class="category__container">
-      <CategoryFilter :filters="listFilter" />
+      <CategoryFilter @updateFiltres="updateFilter" :filters="listFilter" />
       <div class="category__content">
         <ProductCard
             v-for="(item, index) in listProduct"
