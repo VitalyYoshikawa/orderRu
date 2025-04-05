@@ -1,48 +1,67 @@
 import { H3Event } from "h3"
 import { BACKEND_DOMAIN } from "~/const/common"
+import qs from 'qs'
 import type { Card } from "~/interfaces/product"
 
-interface QueryParamsResult {
-    section: string
-    params: string
+interface EntityConfig {
+    filterPath: Array<string>
 }
 
+const ENTITY_CONFIGS: Record<string, EntityConfig> = {
+    'cat_': {
+        filterPath: ['type_product','subcategory','category','url']
+    },
+    'subcat_': {
+        filterPath: ['type_product','subcategory', 'url']
+    },
+    'type_': {
+        filterPath: ['type_product', 'url']
+    }
+}
 
-const queryParams = (id: string, filter: string[] | Array<string>[]): QueryParamsResult => {
-    let queryStr = ''
-    if (filter.length) {
-        filter.forEach((val, index) => {
+const buildQueryParams = (id: string, filters: string[] | Array<string>[]): string => {
+    const prefix = Object.keys(ENTITY_CONFIGS).find(p => id.startsWith(p)) || 'cat_'
+    const config = ENTITY_CONFIGS[prefix]
+
+    const filterObj: Record<string, any> = {}
+
+    if (filters.length) {
+        filters.forEach((val, index) => {
             if (Array.isArray(val)) {
-                val.forEach((val: string) => {
-                    queryStr += `filters[$or][${index}][attribute_values][value][$eq]=${val}&`
-                })
+                filterObj['$or'] = val.map(filterValue => ({
+                    attribute_values: {
+                        value: { $eq: filterValue }
+                    }
+                }))
             } else {
-                queryStr += `filters[$and][${index}][attribute_values][value][$eq]=${val}&`
+                filterObj['$and'] = filterObj['$and'] || []
+                filterObj['$and'].push({
+                    attribute_values: {
+                        value: { $eq: val }
+                    }
+                })
             }
         })
     }
 
-    let categoryFilter: string
-    if (id.startsWith('cat_')) {
-        categoryFilter = `filters[$and][${filter.length}][type_product][subcategory][category][url][$eq]=${id}`
-    } else if (id.startsWith('subcat_')) {
-        categoryFilter = `filters[$and][${filter.length}][type_product][subcategory][url][$eq]=${id}`
-    } else if (id.startsWith('type_')) {
-        categoryFilter = `filters[$and][${filter.length}][type_product][url][$eq]=${id}`
-    } else {
-        categoryFilter = `filters[type_product][subcategory][category][url][$eq]=${id}`
+    let current = filterObj
+    config.filterPath.forEach((part, idx) => {
+        current[part] = idx === config.filterPath.length - 1
+            ? { $eq: id }
+            : {}
+        current = current[part]
+    })
+
+    const query = {
+        filters: filterObj,
+        populate: {
+            media: {
+                fields: ['url']
+            }
+        }
     }
 
-    if (filter.length) {
-        queryStr += categoryFilter
-    } else {
-        queryStr = categoryFilter
-    }
-
-    return {
-        section: 'products',
-        params: `?${queryStr}&populate[media][fields][0]=url`
-    }
+    return qs.stringify(query, { encodeValuesOnly: true })
 }
 
 const formatProductCard = (product: any): Card => {
@@ -56,35 +75,27 @@ const formatProductCard = (product: any): Card => {
     }
 }
 
+const parseFilters = (filter: object): string[] | Array<string>[] => {
+    return Object.values(filter).map(item =>
+        typeof item === 'string' && item.includes('%') ? item.split('%') : item
+    )
+}
+
 export default defineEventHandler(async (event: H3Event): Promise<Card[]> => {
     const id = getRouterParam(event, 'id')
-    const filter: object = await readBody(event)
-
-    let filterStr: string[] = []
-
-    Object.values(filter).forEach((item) => {
-        if (item.includes('%')) {
-            filterStr.push(item.split('%'))
-        } else {
-            filterStr.push(item)
-        }
-    })
-
+    const filter = await readBody(event)
 
     if (!id) return []
 
-    const { section, params } = queryParams(id, filterStr)
-
     try {
+        const filterStr = parseFilters(filter)
+        const query = buildQueryParams(id, filterStr)
+
         const { data } = await $fetch<any>(
-            `${BACKEND_DOMAIN}/api/${section}${params}`
+            `${BACKEND_DOMAIN}/api/products?${query}`
         )
 
-        if (!data?.length) return []
-
-        const result = data.map((item: any) => formatProductCard(item))
-
-        return result
+        return data?.map((item: any) => formatProductCard(item)) || []
 
     } catch (error) {
         console.error('Error fetching products:', error)

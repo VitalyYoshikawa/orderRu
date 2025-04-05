@@ -1,68 +1,100 @@
 import { H3Event } from "h3"
 import { BACKEND_DOMAIN } from "~/const/common"
 import qs from 'qs'
-import {Breadcrumb, Seo} from "~/interfaces/seo"
+import { Breadcrumb, Seo } from "~/interfaces/seo"
 
-const buildQuery = (type: string, pathId: string): string => {
+interface EntityConfig {
+    endpoint: string
+    populatePath: string[]
+    fields: string[]
+}
+
+const ENTITY_CONFIGS: Record<string, EntityConfig> = {
+    'cat_': {
+        endpoint: 'categories',
+        populatePath: [],
+        fields: ['id', 'name', 'url']
+    },
+    'subcat_': {
+        endpoint: 'subcategories',
+        populatePath: ['category'],
+        fields: ['id', 'name', 'url']
+    },
+    'type_': {
+        endpoint: 'type-products',
+        populatePath: ['subcategory', 'category'],
+        fields: ['id', 'name', 'url']
+    },
+    'product': {
+        endpoint: 'products',
+        populatePath: ['type_product', 'subcategory', 'category'],
+        fields: ['id', 'name', 'url']
+    }
+}
+
+const buildDynamicQuery = (type: string, pathId: string): string => {
+    const prefix = Object.keys(ENTITY_CONFIGS).find(p => pathId.startsWith(p)) ||
+        (type === 'products' ? 'product' : null)
+
+    if (!prefix) return ''
+
+    const config = ENTITY_CONFIGS[prefix]
     const baseQuery = {
         filters: { url: { $eq: pathId } },
-        fields: ['id', 'name', 'url'],
+        fields: config.fields,
         populate: {} as Record<string, any>
     }
 
-    switch (true) {
-        case pathId.startsWith('cat_'):
-            return `categories?${qs.stringify(baseQuery, { encodeValuesOnly: true })}`
-        case pathId.startsWith('subcat_'):
-            baseQuery.populate.category = { fields: ['id', 'name', 'url'] }
-            return `subcategories?${qs.stringify(baseQuery, { encodeValuesOnly: true })}`
-        case pathId.startsWith('type_'):
-            baseQuery.populate.subcategory = {
-                fields: ['id', 'name', 'url'],
-                populate: { category: { fields: ['id', 'name', 'url'] } }
-            }
-            return `type-products?${qs.stringify(baseQuery, { encodeValuesOnly: true })}`
-        default:
-            if (type === 'products') {
-                baseQuery.populate.type_product = {
-                    fields: ['id', 'name', 'url'],
-                    populate: {
-                        subcategory: {
-                            fields: ['id', 'name', 'url'],
-                            populate: { category: { fields: ['id', 'name', 'url'] } }
-                        }
-                    }
-                }
-                return `products?${qs.stringify(baseQuery, { encodeValuesOnly: true })}`
-            }
-            return ''
-    }
+    let currentPopulate = baseQuery.populate
+    config.populatePath.forEach((path, index) => {
+        currentPopulate[path] = {
+            fields: config.fields,
+            ...(index < config.populatePath.length - 1 ? { populate: {} } : {})
+        }
+        currentPopulate = currentPopulate[path].populate || {}
+    })
+
+    return `${config.endpoint}?${qs.stringify(baseQuery, { encodeValuesOnly: true })}`
 }
 
 const buildBreadcrumbs = (data: any): Seo => {
     const breadcrumbs: Breadcrumb[] = []
     let current = data[0]
 
+    const relationFields = ['type_product', 'subcategory', 'category']
+
     while (current) {
-        breadcrumbs.unshift({ name: current.name, url: `/categories/${current.url}` })
-        current = current.type_product || current.subcategory || current.category
+        breadcrumbs.unshift({
+            name: current.name,
+            url: `/categories/${current.url}`
+        })
+
+        current = relationFields.reduce((acc, field) => acc || current[field], null)
     }
 
-    return { title: data[0].name, breadcrumbs }
+    return {
+        title: data[0]?.name || '',
+        breadcrumbs
+    }
 }
 
 export default defineEventHandler(async (event: H3Event): Promise<Seo | null> => {
     const { pathName, pathId } = await readBody(event)
     const type = pathName.replace('-id', '')
-    const query = buildQuery(type, pathId)
+    const query = buildDynamicQuery(type, pathId)
 
-    if (!query) throw createError({ statusCode: 400, message: 'Invalid path' })
-
-    const { data } = await $fetch<any>(`${BACKEND_DOMAIN}/api/${query}`)
-
-    if (!data || data.length === 0) {
-        return null
+    if (!query) {
+        throw createError({ statusCode: 400, message: 'Invalid path' })
     }
 
-    return buildBreadcrumbs(data)
+    try {
+        const { data } = await $fetch<{ data: any[] }>(`${BACKEND_DOMAIN}/api/${query}`)
+
+        if (!data?.length) return null
+
+        return buildBreadcrumbs(data)
+    } catch (error) {
+        console.error('Error fetching SEO data:', error)
+        throw createError({ statusCode: 500, message: 'Failed to load SEO data' })
+    }
 })

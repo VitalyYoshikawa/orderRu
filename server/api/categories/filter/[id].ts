@@ -1,59 +1,62 @@
 import { H3Event } from "h3"
 import { BACKEND_DOMAIN } from "~/const/common"
 import qs from 'qs'
-import {AttributeData, Filter, QueryParams} from "~/interfaces/category"
+import { AttributeData, Filter, QueryParams } from "~/interfaces/category"
 
-const buildQuery = (id: string): [string, QueryParams] | null => {
-    const baseParams: QueryParams = {
+interface DynamicEntityConfig {
+    path: string[]
+}
+
+const ENTITY_CONFIGS: Record<string, DynamicEntityConfig> = {
+    'cat_': {
+        path: ['attributes']
+    },
+    'subcat_': {
+        path: ['category', 'attributes']
+    },
+    'type_': {
+        path: ['subcategory', 'category', 'attributes']
+    }
+}
+
+const buildDynamicQuery = (id: string): [string, QueryParams] | null => {
+    const prefix = Object.keys(ENTITY_CONFIGS).find(p => id.startsWith(p))
+    if (!prefix) return null
+
+    const entityType = prefix === 'cat_' ? 'categories' :
+        prefix === 'subcat_' ? 'subcategories' : 'type-products'
+
+    const populate: Record<string, any> = {}
+    let current = populate
+    const config = ENTITY_CONFIGS[prefix]
+
+    config.path.forEach((path, index) => {
+        current[path] = index === config.path.length - 1
+            ? { populate: 'attribute_values' }
+            : { populate: {} }
+        current = current[path].populate
+    })
+
+    const queryParams: QueryParams = {
         filters: { url: { $eq: id } },
-        populate: {},
+        populate,
         fields: ['id']
     }
 
-    switch (true) {
-        case id.startsWith('cat_'):
-            baseParams.populate.attributes = { populate: 'attribute_values' }
-            return ['categories', baseParams]
-
-        case id.startsWith('subcat_'):
-            baseParams.populate.category = {
-                populate: { attributes: { populate: 'attribute_values' } }
-            }
-            return ['subcategories', baseParams]
-
-        case id.startsWith('type_'):
-            baseParams.populate.subcategory = {
-                populate: {
-                    category: {
-                        populate: { attributes: { populate: 'attribute_values' } }
-                    }
-                }
-            }
-            return ['type_products', baseParams]
-
-        default:
-            return null
-    }
+    return [entityType, queryParams]
 }
 
-const extractAttributes = (data: any, id: string): AttributeData[] | null => {
-    const item = data[0]
-
-    switch (true) {
-        case id.startsWith('cat_'):
-            return item.attributes
-        case id.startsWith('subcat_'):
-            return item.category?.attributes
-        case id.startsWith('type_'):
-            return item.subcategory?.category?.attributes
-        default:
-            return null
+const getNestedAttributes = (data: any, path: string[]): AttributeData[] | null => {
+    let result = data[0]
+    for (const key of path) {
+        if (!result?.[key]) return null
+        result = result[key]
     }
+    return result
 }
 
-
-const formatFilters = (attributes: AttributeData[]): Filter[] => {
-    return attributes.map(attribute => ({
+const formatDynamicFilters = (attributes: AttributeData[] | null): Filter[] => {
+    return attributes?.map(attribute => ({
         type: attribute.type,
         label: attribute.name,
         name: attribute.name,
@@ -61,14 +64,14 @@ const formatFilters = (attributes: AttributeData[]): Filter[] => {
             value: value.value,
             label: value.name
         })) || []
-    }))
+    })) || []
 }
 
 export default defineEventHandler(async (event: H3Event): Promise<Filter[] | null> => {
     const id = getRouterParam(event, 'id')
     if (!id) return null
 
-    const queryData = buildQuery(id)
+    const queryData = buildDynamicQuery(id)
     if (!queryData) return null
 
     const [entity, queryParams] = queryData
@@ -78,8 +81,9 @@ export default defineEventHandler(async (event: H3Event): Promise<Filter[] | nul
 
     if (!data?.length) return null
 
-    const attributes = extractAttributes(data, id)
-    if (!attributes) return null
+    const prefix = Object.keys(ENTITY_CONFIGS).find(p => id.startsWith(p))
+    if (!prefix) return null
 
-    return formatFilters(attributes)
+    const attributes = getNestedAttributes(data, ENTITY_CONFIGS[prefix].path)
+    return formatDynamicFilters(attributes)
 })
