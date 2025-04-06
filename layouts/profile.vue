@@ -9,7 +9,6 @@
         <div class="profile__sticky">
           <div class="profile__navigate">
             <NuxtLink class="profile__navigate-item" to="/profile/settings">Профиль</NuxtLink>
-            <NuxtLink class="profile__navigate-item" to="/profile/companies">Мои компании</NuxtLink>
           </div>
         </div>
       </div>

@@ -48,9 +48,7 @@ export default defineEventHandler(async (event: H3Event): Promise<Product | null
         `${BACKEND_DOMAIN}/api/products?${query}`
     )
 
-    if (!data || data.length === 0) {
-        return null
-    }
+    if (!data?.length) return null
 
     const groupedAttributes = data[0].attribute_values.map((attr): AttributeValue => ({
         name: attr.attribute.name,

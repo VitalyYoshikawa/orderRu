@@ -1,14 +1,55 @@
 <script setup lang="ts">
 import type {Card, Product} from "~/interfaces/product"
-import getSeo from "~/utils/getSeo";
+import getSeo from "~/utils/getSeo"
+import favorite from "~/store/favorite"
+import basket from "~/store/basket";
 
-
+const favoriteStore = favorite()
 const paramId = useRouter().currentRoute.value.params.id
 
 const seo = await getSeo()
 const recommendations = await useCustomFetch<Card[]>('/api/products/recommendations')
 const data = await useCustomFetch<Product>(`/api/products/${paramId}`)
 
+const basketStore = basket()
+
+const showCounterRef = ref(!!basketStore.findObject(data?.documentId))
+
+const toggleFavoriteRef = ref(favoriteStore?.favorites?.includes(<string>data?.documentId))
+
+const handleCounterMinus = (val: number) => {
+  if (!data?.documentId) return
+
+  showCounterRef.value = val > 0
+  basketStore.handleCounterMinus()
+  basketStore.removeFromBasket({
+    id: data?.documentId,
+    count: val
+  })
+}
+const handleCounterPlus = (val: number) => {
+  if (!data?.documentId) return
+
+  showCounterRef.value = val > 0
+  basketStore.handleCounterPlus()
+  basketStore.addToBasket({
+    id: data?.documentId,
+    count: val
+  })
+}
+
+const handleClickFavorite = () => {
+  if (!data?.documentId) return
+
+  if (!toggleFavoriteRef.value) {
+    favoriteStore.handleCounterPlus()
+    favoriteStore.addToFavorites(data?.documentId)
+  } else {
+    favoriteStore.handleCounterMinus()
+    favoriteStore.removeFromFavorites(data?.documentId)
+  }
+  toggleFavoriteRef.value = !toggleFavoriteRef.value
+}
 </script>
 
 <template>
@@ -36,10 +77,20 @@ const data = await useCustomFetch<Product>(`/api/products/${paramId}`)
             <ProductPrice :number="data.original_price" class="product-price--original"/>
           </div>
           <div class="purchase__actions">
-            <UiButton class="button--border">
-              <Icon name="mage:heart"/>
+            <UiButton @click="handleClickFavorite" class="button--border button--favorite">
+              <Icon :name="favoriteStore?.favorites?.includes(data.documentId) ? 'mage:heart-fill' : 'mage:heart'"/>
             </UiButton>
-            <UiButton>Купить</UiButton>
+            <UiCounter
+                class="purchase__counter--width"
+                v-if="showCounterRef"
+                :count="basketStore.findObject(data?.documentId)?.count"
+                :max="data.count"
+                @counterMinus="handleCounterMinus"
+                @counterPlus="handleCounterPlus"/>
+            <UiButton
+                @click="handleCounterPlus(1)"
+                v-if="!showCounterRef"
+            >Купить</UiButton>
           </div>
           <span class="purchase__delivery">Доставим 1 апреля</span>
         </div>
@@ -67,7 +118,7 @@ const data = await useCustomFetch<Product>(`/api/products/${paramId}`)
             :url="item.url"
             :rating="item.rating"
             :commentCount="item.commentCount"
-            :favorite="item.favorite"
+            :favorite="favoriteStore?.favorites?.includes(item.id)"
         />
       </div>
     </div>
@@ -177,4 +228,7 @@ const data = await useCustomFetch<Product>(`/api/products/${paramId}`)
   display: block
   width: 20px
   height: 20px
+
+.purchase__counter--width
+  width: 180px
 </style>

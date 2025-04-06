@@ -31,4 +31,9 @@
   &:hover
     background: var(--color-blue)
     color: var(--color-white)
+.button--favorite
+  span
+    background-color: var(--color-red)
+  &:hover
+    background: var(--color-white)
 </style>

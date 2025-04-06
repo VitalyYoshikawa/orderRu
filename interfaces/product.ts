@@ -7,7 +7,7 @@ export interface Card {
     url: string,
     rating?: number,
     commentCount?: number,
-    favorite?: boolean | null | undefined
+    count?: number,
 }
 
 export interface Attribute {

@@ -1,6 +1,9 @@
 <script setup lang="ts">
-defineProps<{
-  id: number | string,
+import basket from "~/store/basket"
+import favorite from "~/store/favorite"
+
+const props = defineProps<{
+  id: string,
   name: string,
   images: string[],
   price?: number | string,
@@ -8,9 +11,47 @@ defineProps<{
   url: string,
   rating: number | string | undefined,
   commentCount: number | string | undefined,
-  favorite?: boolean | null | undefined,
   buy?: boolean | null | undefined,
+  count?: number | undefined,
 }>()
+
+const emit = defineEmits(['onClickFavorite', 'updateProductCount'])
+
+const basketStore = basket()
+const favoriteStore = favorite()
+
+const showCounterRef = ref(!!basketStore.findObject(props?.id))
+const toggleFavoriteRef = ref(favoriteStore?.favorites?.includes(props?.id))
+
+const handleCounterMinus = (val: number) => {
+  showCounterRef.value = val > 0
+  basketStore.handleCounterMinus()
+  basketStore.removeFromBasket({
+    id: props?.id,
+    count: val
+  })
+  emit('updateProductCount')
+}
+const handleCounterPlus = (val: number) => {
+  showCounterRef.value = val > 0
+  basketStore.handleCounterPlus()
+  basketStore.addToBasket({
+    id: props?.id,
+    count: val
+  })
+  emit('updateProductCount')
+}
+const handleClickFavorite = () => {
+  if (!toggleFavoriteRef.value) {
+    favoriteStore.handleCounterPlus()
+    favoriteStore.addToFavorites(props.id)
+  } else {
+    favoriteStore.handleCounterMinus()
+    favoriteStore.removeFromFavorites(props.id)
+  }
+  toggleFavoriteRef.value = !toggleFavoriteRef.value
+  emit('onClickFavorite')
+}
 </script>
 
 <template>
@@ -21,14 +62,16 @@ defineProps<{
         <ProductPrice v-if="price" :number="price"/>
         <ProductPrice v-if="originalPrice" :number="originalPrice" class="product-price--original"/>
       </div>
-      <span class="product-card__name">{{name}}</span>
+      <span class="product-card__name">{{ name }}</span>
       <div class="product-card__inner">
         <ProductRating :number="rating"/>
         <ProductCommentCount :number="commentCount"/>
       </div>
     </NuxtLink>
-    <ProductFavorite :class="['product-card__product-favorite', {'product-favorite--active' : favorite}]"/>
-    <UiButton v-if="buy">Купить</UiButton>
+    <ProductFavorite @click="handleClickFavorite()"
+                     :class="['product-card__product-favorite', {'product-favorite--active' : toggleFavoriteRef}]"/>
+    <UiCounter v-if="showCounterRef && buy" :count="basketStore.findObject(props?.id)?.count" :max="count" @counterMinus="handleCounterMinus" @counterPlus="handleCounterPlus"/>
+    <UiButton @click="handleCounterPlus(1)" v-if="buy && !showCounterRef">Купить</UiButton>
   </div>
 </template>
 
@@ -44,6 +87,7 @@ defineProps<{
   display: flex
   flex-direction: column
   gap: 7px
+
   &:hover
     .product-card__name
       color: var(--color-blue)

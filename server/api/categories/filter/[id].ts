@@ -79,7 +79,7 @@ export default defineEventHandler(async (event: H3Event): Promise<Filter[] | nul
         `${BACKEND_DOMAIN}/api/${entity}?${qs.stringify(queryParams, { encodeValuesOnly: true })}`
     )
 
-    if (!data?.length) return null
+    if (!data?.length) return []
 
     const prefix = Object.keys(ENTITY_CONFIGS).find(p => id.startsWith(p))
     if (!prefix) return null
