@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const isOpenModalRef = ref<boolean>(false)
 
+
 </script>
 
 <template>

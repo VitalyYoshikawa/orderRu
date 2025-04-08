@@ -5,10 +5,10 @@ import {Card} from "~/interfaces/product"
 
 
 
-export default defineEventHandler(async (event: H3Event): Promise<Card[] | null> => {
-    const filter = await readBody(event)
+export default defineEventHandler(async (event: H3Event): Promise<Card[] | undefined> => {
+    const filter = await readBody<{ids: string[] | object[]}>(event)
 
-    if (!filter?.ids) return []
+    if (!filter?.ids?.length) return undefined
 
     const query = qs.stringify(
         {
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event: H3Event): Promise<Card[] | null>
         `${BACKEND_DOMAIN}/api/products?${query}`
     )
 
-    if (!data?.length) return []
+    if (!data?.length) return undefined
 
     const formatProductCard = (product: any): Card => {
         return {
@@ -46,5 +46,5 @@ export default defineEventHandler(async (event: H3Event): Promise<Card[] | null>
         }
     }
 
-    return data?.map((item: any) => formatProductCard(item)) || []
+    return data?.map((item: any) => formatProductCard(item))
 })

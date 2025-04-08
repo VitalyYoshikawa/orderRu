@@ -5,7 +5,7 @@ export default async <T>(
     options: UseFetchOptions<T> = {},
     requestPage?: boolean
 ): Promise<T | null> => {
-    const { data, error } = await useFetch<T>(url, options as object )
+    const { data, error } = await useFetch<T>(url, {...options, server: false} as object, )
 
     if (error.value) {
         console.error(error.value.message);
@@ -15,7 +15,8 @@ export default async <T>(
                 statusCode: error.value.statusCode,
             });
         }
-        return null;
+
+        return Promise.resolve(null) as T
     }
 
     return data.value as T
